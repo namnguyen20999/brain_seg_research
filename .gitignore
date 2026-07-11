@@ -1,5 +1,6 @@
 # Datasets & generated data
-datasets/
+datasets/*
+!datasets/2D_dataset_T1_png/
 visualizations/
 evaluation/feature_maps_output/
 evaluation/evaluated_image/
@@ -14,7 +15,6 @@ nnUNet_results/*
 
 # Nested third-party repos (cloned separately, not part of this repo)
 Pytorch-UNet/
-nnUNet/
 unified-focal-loss/
 
 # Python
