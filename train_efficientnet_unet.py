@@ -64,16 +64,63 @@ class BrainTumorDataset(Dataset):
         return image, mask
 
 
-def build_datasets(raw_dir: Path, val_fraction: float, seed: int):
-    images_dir = raw_dir / "imagesTr"
-    labels_dir = raw_dir / "labelsTr"
-    case_ids = sorted(p.stem[:-5] for p in images_dir.glob("*_0000.png"))
-    if not case_ids:
-        raise RuntimeError(f"No cases found under {images_dir}")
+class SliceDataset(Dataset):
+    """Reads a pipeline-stage dir (e.g. datasets/2D_dataset_T1_png):
 
-    full_dataset = BrainTumorDataset(images_dir, labels_dir, case_ids)
-    n_val = max(1, round(len(case_ids) * val_fraction))
-    n_train = len(case_ids) - n_val
+    <patient_id>/images/<slice_id>.png -> single-channel MRI slice, uint8 [0, 255]
+    <patient_id>/masks/<slice_id>.png  -> single-channel mask, uint8 {0, 255}
+    """
+
+    def __init__(self, pairs: list[tuple[Path, Path]]):
+        self.pairs = pairs
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self, idx):
+        image_path, mask_path = self.pairs[idx]
+        from PIL import Image
+
+        image = np.array(Image.open(image_path).convert("L"), dtype=np.float32) / 255.0
+        mask = (np.array(Image.open(mask_path).convert("L")) > 0).astype(np.float32)
+
+        image = torch.from_numpy(image).unsqueeze(0)  # (1, H, W)
+        mask = torch.from_numpy(mask).unsqueeze(0)     # (1, H, W)
+        return image, mask
+
+
+def _find_slice_pairs(raw_dir: Path) -> list[tuple[Path, Path]]:
+    pairs = []
+    for patient_dir in sorted(p for p in raw_dir.iterdir() if p.is_dir()):
+        images_dir = patient_dir / "images"
+        masks_dir = patient_dir / "masks"
+        if not images_dir.is_dir() or not masks_dir.is_dir():
+            continue
+        for img_path in sorted(images_dir.glob("*.png")):
+            mask_path = masks_dir / img_path.name
+            if mask_path.is_file():
+                pairs.append((img_path, mask_path))
+    return pairs
+
+
+def build_datasets(raw_dir: Path, val_fraction: float, seed: int):
+    if (raw_dir / "imagesTr").is_dir():
+        images_dir = raw_dir / "imagesTr"
+        labels_dir = raw_dir / "labelsTr"
+        case_ids = sorted(p.stem[:-5] for p in images_dir.glob("*_0000.png"))
+        if not case_ids:
+            raise RuntimeError(f"No cases found under {images_dir}")
+        full_dataset = BrainTumorDataset(images_dir, labels_dir, case_ids)
+        n = len(case_ids)
+    else:
+        pairs = _find_slice_pairs(raw_dir)
+        if not pairs:
+            raise RuntimeError(f"No <patient>/images + <patient>/masks pairs found under {raw_dir}")
+        full_dataset = SliceDataset(pairs)
+        n = len(pairs)
+
+    n_val = max(1, round(n * val_fraction))
+    n_train = n - n_val
 
     generator = torch.Generator().manual_seed(seed)
     train_set, val_set = random_split(full_dataset, [n_train, n_val], generator=generator)
@@ -183,7 +230,7 @@ def get_device(requested: str):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--nnunet-raw", default=str(ROOT / "nnUNet_raw" / "Dataset001_BrainTumorProcessed"))
+    parser.add_argument("--nnunet-raw", default=str(ROOT / "datasets" / "pipeline_output"))
     parser.add_argument("--output-dir", default=str(ROOT / "training_output" / "efficientnet_unet"))
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=4)
