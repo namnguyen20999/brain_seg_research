@@ -1,0 +1,14 @@
+{
+    "channel_names": {
+        "0": "MRI"
+    },
+    "labels": {
+        "background": 0,
+        "tumor": 1
+    },
+    "numTraining": 3064,
+    "numTest": 0,
+    "file_ending": ".png",
+    "name": "Dataset001_BrainTumorProcessed",
+    "description": "Brain tumor MRI segmentation (binary: background / tumor)."
+}

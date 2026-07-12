@@ -5,14 +5,6 @@ visualizations/
 evaluation/feature_maps_output/
 evaluation/evaluated_image/
 
-# nnUNet directories (keep as empty placeholders, ignore contents)
-nnUNet_raw/*
-!nnUNet_raw/.gitkeep
-nnUNet_preprocessed/*
-!nnUNet_preprocessed/.gitkeep
-nnUNet_results/*
-!nnUNet_results/.gitkeep
-
 # Nested third-party repos (cloned separately, not part of this repo)
 Pytorch-UNet/
 unified-focal-loss/
